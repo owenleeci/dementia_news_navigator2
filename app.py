@@ -2,6 +2,10 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import os
+import jieba
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import urllib.request
 
 # 網頁設定：將標題與圖示設定好，並改為寬螢幕模式以呈現更多資訊
 st.set_page_config(
@@ -100,37 +104,101 @@ def main():
     if selected_source != "全部":
         filtered_df = filtered_df[filtered_df['source'] == selected_source]
 
-    # --- 主畫面：新聞展示 ---
+    # --- 主畫面：新聞展示與趨勢分析 ---
     st.subheader(f"📑 篩選結果：共 {len(filtered_df)} 篇")
     
     if len(filtered_df) == 0:
         st.info("找不到符合條件的新聞，請嘗試調整左側的篩選條件。")
-    
-    # 網格狀排列，每排兩欄
-    col1, col2 = st.columns(2)
-    
-    # 將過濾後的資料轉為字典清單方便迴圈
-    records = filtered_df.to_dict('records')
-    
-    for i, row in enumerate(records):
-        # 交替放在左右兩欄
-        col = col1 if i % 2 == 0 else col2
+        return
         
-        with col:
-            # 使用 Expander 來作為折疊式的新聞卡片
-            # 標題加上來源和分類的標籤作為提示
-            expander_title = f"{row['title']} | 🏷️ {row['category']} | 📰 {row['source']}"
+    tab1, tab2 = st.tabs(["📑 新聞列表", "📈 趨勢分析"])
+    
+    with tab1:
+        # 網格狀排列，每排兩欄
+        col1, col2 = st.columns(2)
+        
+        # 將過濾後的資料轉為字典清單方便迴圈
+        records = filtered_df.to_dict('records')
+        
+        for i, row in enumerate(records):
+            # 交替放在左右兩欄
+            col = col1 if i % 2 == 0 else col2
             
-            with st.expander(expander_title):
-                st.caption(f"發布時間: {row['published_at']}")
+            with col:
+                # 使用 Expander 來作為折疊式的新聞卡片
+                # 標題加上來源和分類的標籤作為提示
+                expander_title = f"{row['title']} | 🏷️ {row['category']} | 📰 {row['source']}"
                 
-                # 判斷 AI 摘要是否為空
-                if pd.isna(row['summary']) or row['summary'].strip() == "":
-                    st.write("此篇新聞尚無 AI 摘要內容。")
-                    st.write(row['original_text'])
-                else:
-                    # 直接渲染 Markdown 格式的摘要，這就是我們五段式 Prompt 發揮威力的地方
-                    st.markdown(row['summary'])
+                with st.expander(expander_title):
+                    st.caption(f"發布時間: {row['published_at']}")
+                    
+                    # 判斷 AI 摘要是否為空
+                    if pd.isna(row['summary']) or row['summary'].strip() == "":
+                        st.write("此篇新聞尚無 AI 摘要內容。")
+                        st.write(row['original_text'])
+                    else:
+                        # 直接渲染 Markdown 格式的摘要，這就是我們五段式 Prompt 發揮威力的地方
+                        st.markdown(row['summary'])
+
+    with tab2:
+        st.markdown("### 📊 數據統計與熱門關鍵字")
+        st.markdown("以下圖表基於目前左側欄篩選出的新聞數量進行統計。")
+        
+        col_chart1, col_chart2 = st.columns(2)
+        
+        with col_chart1:
+            st.markdown("#### 📌 依分類統計")
+            category_counts = filtered_df['category'].value_counts()
+            st.bar_chart(category_counts)
+            
+        with col_chart2:
+            st.markdown("#### 📰 依來源統計")
+            source_counts = filtered_df['source'].value_counts()
+            st.bar_chart(source_counts)
+            
+        st.markdown("---")
+        st.markdown("#### ☁️ 摘要關鍵字文字雲")
+        
+        # 生成文字雲
+        text_content = " ".join(filtered_df['summary'].dropna().tolist())
+        
+        if text_content.strip():
+            # 使用 jieba 進行中文斷詞
+            words = jieba.cut(text_content)
+            # 過濾常見無意義停用詞
+            stop_words = {"的", "在", "是", "與", "及", "和", "了", "有", "為", "以", "等", "也", "將", "對", "就", "未分類", "延伸閱讀", "趨勢摘要", "預防", "早篩", "治療", "無相關資訊"}
+            filtered_words = [str(w) for w in words if str(w) not in stop_words and len(str(w)) > 1]
+            processed_text = " ".join(filtered_words)
+            
+            # 使用公版中文字型避免亂碼，如果雲端環境沒有會自動下載開源字體
+            font_path = "NotoSansTC-Regular.otf"
+            if not os.path.exists(font_path) and os.name != 'nt':
+                try:
+                    urllib.request.urlretrieve("https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf", font_path)
+                except:
+                    font_path = None
+                    
+            if os.name == 'nt' and (font_path is None or not os.path.exists(font_path)):
+                 # Windows 也可以直接使用內建字體
+                 font_path = "C:/Windows/Fonts/msjh.ttc"
+            
+            try:
+                wordcloud = WordCloud(
+                    width=800, 
+                    height=400, 
+                    background_color='white',
+                    font_path=font_path,
+                    colormap='ocean'
+                ).generate(processed_text)
+                
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis('off')
+                st.pyplot(fig)
+            except Exception as e:
+                st.warning(f"目前環境無法生成文字雲：{e}")
+        else:
+            st.info("目前沒有足夠的摘要文字以生成文字雲。")
 
 if __name__ == "__main__":
     main()
