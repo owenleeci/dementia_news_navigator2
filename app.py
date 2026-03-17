@@ -59,7 +59,7 @@ def load_data():
 # 網頁主程式
 def main():
     # 頂部標題
-    st.title("🧠 失智症新聞自動導航員")
+    st.title("🧠 失智症新聞自動導航員^^")
     st.markdown("每日為您精選、AI 總結各大醫學期刊與新聞網站的失智症重點資訊。")
     st.divider()
 
@@ -69,6 +69,10 @@ def main():
     if df.empty:
         st.warning("目前資料庫中尚無新聞。請先執行爬蟲與 AI 處理管線 (main_pipeline.py)。")
         return
+        
+    # 計算最新資料時間
+    last_update = df['created_at'].max() if 'created_at' in df.columns else "未知"
+    st.caption(f"🔄 資料更新時間: {last_update}")
 
     # --- 側邊欄：進階篩選功能 ---
     with st.sidebar:
