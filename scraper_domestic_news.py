@@ -47,7 +47,7 @@ def fetch_domestic_health_news():
             
             print(f"✅ 國內新聞: {title}")
             count += 1
-            if count >= 5: # 測試只留 5 篇
+            if count >= 10: # 測試只留 5 篇
                  break
     else:
          print("❌ RSS 抓取失敗")

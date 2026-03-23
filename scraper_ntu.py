@@ -47,8 +47,8 @@ def fetch_ntu_karenchen_news():
         
         # 假設整個網頁就是一篇介紹或文章
         content = soup.get_text(separator='\n', strip=True)
-        # 取前 500 字作為預覽
-        preview = content[:500] + "..." if len(content) > 500 else content
+        # 取前 5000 字作為預覽
+        preview = content[:5000] + "..." if len(content) > 5000 else content
         
         news_data = {
             "Title": soup.title.string if soup.title else "台大老師網站更新",
